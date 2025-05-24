@@ -52,6 +52,8 @@
       let playerId = null;
       let gameState = { players: [], map: [] };
       const inputs = { left: false, right: false, jump: false };
+      const CANVAS_WIDTH = 800;
+      const CANVAS_HEIGHT = 600;
 
       function joinGame() {
         const name = document.getElementById("player-name").value || "Player";
@@ -69,8 +71,8 @@
             // Switch to game view
             entryScreen.style.display = "none";
             canvas.style.display = "block";
-            canvas.width = 800;
-            canvas.height = 600;
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
           } else if (data.type === "state") {
             gameState = data;
           }
@@ -103,24 +105,33 @@
         }
       }
 
-      // Render game
+      // Render game with camera following the player
       function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Find the player's position for camera
+        const player = gameState.players.find((p) => p.id === playerId);
+        let cameraX = 0;
+        let cameraY = 0;
+        if (player) {
+          cameraX = player.x - CANVAS_WIDTH / 2;
+          cameraY = player.y - CANVAS_HEIGHT / 2;
+        }
 
         // Draw platforms
         ctx.fillStyle = "#333";
         for (const [x, y, w, h] of gameState.map) {
-          ctx.fillRect(x, y, w, h);
+          ctx.fillRect(x - cameraX, y - cameraY, w, h);
         }
 
         // Draw players
         gameState.players.forEach((player) => {
           ctx.fillStyle = player.color;
-          ctx.fillRect(player.x, player.y, 20, 20);
+          ctx.fillRect(player.x - cameraX, player.y - cameraY, 20, 20);
           // Draw name
           ctx.fillStyle = "#000";
           ctx.font = "12px Arial";
-          ctx.fillText(player.name, player.x, player.y - 5);
+          ctx.fillText(player.name, player.x - cameraX, player.y - cameraY - 5);
         });
 
         requestAnimationFrame(render);

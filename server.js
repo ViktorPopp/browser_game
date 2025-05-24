@@ -8,15 +8,40 @@ const CONFIG = {
     MOVE_SPEED: 4, // Pixels per frame
     JUMP_SPEED: 10, // Initial upward velocity
     TERMINAL_VELOCITY: 15, // Max fall speed
-    FRICTION: 0.8, // Slowdown when not moving (not used for horizontal movement anymore)
+    FRICTION: 0.8, // Slowdown when not moving (not used for horizontal movement)
   },
   // Map configuration: array of platforms [x, y, width, height]
   MAP: [
+    // Ground and base platforms
     [0, 400, 800, 20], // Ground
-    [200, 300, 200, 20], // Middle platform
-    [500, 200, 150, 20], // Higher platform
+    [0, 580, 800, 20], // Lower ground for extra space
+    // Middle platforms
+    [100, 350, 150, 20], // Left-middle platform
+    [300, 320, 200, 20], // Center-middle platform
+    [550, 340, 150, 20], // Right-middle platform
+    // Higher platforms
+    [50, 250, 100, 20], // Left-high platform
+    [200, 220, 120, 20], // Left-center-high platform
+    [400, 200, 100, 20], // Center-high platform
+    [600, 230, 120, 20], // Right-high platform
+    // Floating platforms
+    [150, 150, 80, 20], // Small floating left
+    [350, 120, 80, 20], // Small floating center
+    [550, 140, 80, 20], // Small floating right
+    // Wall platforms
+    [0, 200, 20, 150], // Left wall platform
+    [780, 200, 20, 150], // Right wall platform
+    // Scattered small platforms
+    [250, 280, 50, 20], // Small mid-left
+    [450, 260, 50, 20], // Small mid-right
+    [100, 100, 60, 20], // Tiny high-left
+    [650, 110, 60, 20], // Tiny high-right
+    // Staggered platforms for vertical climb
+    [700, 300, 80, 20], // Right-middle climb
+    [650, 200, 80, 20], // Right-high climb
+    [700, 100, 80, 20], // Right-top climb
   ],
-  // Game world dimensions
+  // Game world dimensions (used for reference, not bounds enforcement)
   WORLD: {
     WIDTH: 800,
     HEIGHT: 600,
@@ -113,14 +138,7 @@ setInterval(() => {
       }
     }
 
-    // Keep player in bounds
-    if (player.x < 0) player.x = 0;
-    if (player.x > CONFIG.WORLD.WIDTH - 20) player.x = CONFIG.WORLD.WIDTH - 20;
-    if (player.y > CONFIG.WORLD.HEIGHT - 20) {
-      player.y = CONFIG.WORLD.HEIGHT - 20;
-      player.vy = 0;
-      player.grounded = true;
-    }
+    // No boundary checks to allow free exploration
   });
 
   // Broadcast game state
