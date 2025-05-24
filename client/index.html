@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multiplayer Platformer</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+      }
+      #entry-screen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      #entry-screen input,
+      #entry-screen button {
+        margin: 10px;
+        padding: 10px;
+        font-size: 16px;
+      }
+      canvas {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="entry-screen">
+      <input
+        type="text"
+        id="player-name"
+        placeholder="Enter your name"
+        maxlength="20"
+      />
+      <input type="color" id="player-color" value="#ff0000" />
+      <button onclick="joinGame()">Join Game</button>
+    </div>
+    <canvas id="game-canvas"></canvas>
+    <script>
+      const canvas = document.getElementById("game-canvas");
+      const ctx = canvas.getContext("2d");
+      const entryScreen = document.getElementById("entry-screen");
+      let ws = null;
+      let playerId = null;
+      let gameState = { players: [], map: [] };
+      const inputs = { left: false, right: false, jump: false };
+
+      function joinGame() {
+        const name = document.getElementById("player-name").value || "Player";
+        const color = document.getElementById("player-color").value;
+        ws = new WebSocket("ws://localhost:8080");
+
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ type: "join", name, color }));
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.type === "init") {
+            playerId = data.playerId;
+            // Switch to game view
+            entryScreen.style.display = "none";
+            canvas.style.display = "block";
+            canvas.width = 800;
+            canvas.height = 600;
+          } else if (data.type === "state") {
+            gameState = data;
+          }
+        };
+
+        ws.onclose = () => {
+          alert("Disconnected from server");
+          location.reload();
+        };
+      }
+
+      // Handle keyboard input
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") inputs.left = true;
+        if (e.key === "ArrowRight") inputs.right = true;
+        if (e.key === " ") inputs.jump = true;
+        sendInputs();
+      });
+
+      document.addEventListener("keyup", (e) => {
+        if (e.key === "ArrowLeft") inputs.left = false;
+        if (e.key === "ArrowRight") inputs.right = false;
+        if (e.key === " ") inputs.jump = false;
+        sendInputs();
+      });
+
+      function sendInputs() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "input", inputs }));
+        }
+      }
+
+      // Render game
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw platforms
+        ctx.fillStyle = "#333";
+        for (const [x, y, w, h] of gameState.map) {
+          ctx.fillRect(x, y, w, h);
+        }
+
+        // Draw players
+        gameState.players.forEach((player) => {
+          ctx.fillStyle = player.color;
+          ctx.fillRect(player.x, player.y, 20, 20);
+          // Draw name
+          ctx.fillStyle = "#000";
+          ctx.font = "12px Arial";
+          ctx.fillText(player.name, player.x, player.y - 5);
+        });
+
+        requestAnimationFrame(render);
+      }
+
+      requestAnimationFrame(render);
+    </script>
+  </body>
+</html>
