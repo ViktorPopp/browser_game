@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Multiplayer Platformer</title>
+    <style>
+      body {
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: #f0f0f0;
+      }
+      #start-screen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      #game-canvas {
+        display: none;
+      }
+      input,
+      button {
+        margin: 10px;
+        padding: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="start-screen">
+      <input
+        type="text"
+        id="player-name"
+        placeholder="Enter your name"
+        maxlength="20"
+      />
+      <input type="color" id="player-color" value="#ff0000" />
+      <button onclick="startGame()">Start Game</button>
+    </div>
+    <canvas id="game-canvas" width="800" height="600"></canvas>
+
+    <script>
+      const canvas = document.getElementById("game-canvas");
+      const ctx = canvas.getContext("2d");
+      const startScreen = document.getElementById("start-screen");
+      const playerNameInput = document.getElementById("player-name");
+      const playerColorInput = document.getElementById("player-color");
+
+      let playerId = null;
+      let playerName = "";
+      let playerColor = "#ff0000";
+      let ws = null;
+      const players = {};
+      const platforms = [
+        { x: 0, y: 500, width: 800, height: 100 },
+        { x: 200, y: 400, width: 200, height: 20 },
+        { x: 500, y: 300, width: 150, height: 20 },
+      ];
+
+      const gravity = 0.5;
+      const jumpForce = -12;
+      const moveSpeed = 5;
+      let cameraX = 0;
+
+      function startGame() {
+        playerName = playerNameInput.value.trim() || "Player";
+        playerColor = playerColorInput.value;
+        startScreen.style.display = "none";
+        canvas.style.display = "block";
+        connectWebSocket();
+        gameLoop();
+      }
+
+      function connectWebSocket() {
+        ws = new WebSocket("ws://localhost:8080");
+        ws.onopen = () => {
+          ws.send(
+            JSON.stringify({
+              type: "join",
+              name: playerName,
+              color: playerColor,
+            })
+          );
+        };
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.type === "init") {
+            playerId = data.id;
+            Object.assign(players, data.players);
+          } else if (data.type === "update") {
+            Object.assign(players, data.players);
+          } else if (data.type === "remove") {
+            delete players[data.id];
+          }
+        };
+        ws.onclose = () => {
+          console.log("Disconnected from server");
+        };
+      }
+
+      const keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false };
+      document.addEventListener("keydown", (e) => {
+        if (e.key in keys) keys[e.key] = true;
+        if (e.key === "ArrowUp" && players[playerId]?.onGround) {
+          players[playerId].vy = jumpForce;
+          players[playerId].onGround = false;
+        }
+      });
+      document.addEventListener("keyup", (e) => {
+        if (e.key in keys) keys[e.key] = false;
+      });
+
+      function updatePlayer() {
+        if (!players[playerId]) return;
+        const player = players[playerId];
+        player.vx = 0;
+        if (keys.ArrowLeft) player.vx = -moveSpeed;
+        if (keys.ArrowRight) player.vx = moveSpeed;
+        player.vy += gravity;
+        player.x += player.vx;
+        player.y += player.vy;
+
+        // Platform collision
+        player.onGround = false;
+        for (const platform of platforms) {
+          if (
+            player.x < platform.x + platform.width &&
+            player.x + player.width > platform.x &&
+            player.y + player.height > platform.y &&
+            player.y + player.height - player.vy <= platform.y
+          ) {
+            player.y = platform.y - player.height;
+            player.vy = 0;
+            player.onGround = true;
+          }
+        }
+
+        // Ground collision
+        if (player.y > canvas.height - player.height) {
+          player.y = canvas.height - player.height;
+          player.vy = 0;
+          player.onGround = true;
+        }
+
+        // Update camera to follow player
+        cameraX = player.x - canvas.width / 2 + player.width / 2;
+        cameraX = Math.max(0, Math.min(cameraX, 2000 - canvas.width)); // World width: 2000
+
+        // Send update to server
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(
+            JSON.stringify({
+              type: "update",
+              id: playerId,
+              x: player.x,
+              y: player.y,
+              vx: player.vx,
+              vy: player.vy,
+              onGround: player.onGround,
+            })
+          );
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw platforms
+        ctx.fillStyle = "#333";
+        for (const platform of platforms) {
+          ctx.fillRect(
+            platform.x - cameraX,
+            platform.y,
+            platform.width,
+            platform.height
+          );
+        }
+
+        // Draw players
+        for (const id in players) {
+          const p = players[id];
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x - cameraX, p.y, p.width, p.height);
+          ctx.fillStyle = "#000";
+          ctx.font = "12px Arial";
+          ctx.fillText(p.name, p.x - cameraX, p.y - 10);
+        }
+      }
+
+      function gameLoop() {
+        updatePlayer();
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+    </script>
+  </body>
+</html>
