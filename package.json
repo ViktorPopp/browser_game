@@ -3,5 +3,8 @@
   "version": "0.1.0",
   "main": "server.js",
   "author": "Viktor Popp",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.18.2"
+  }
 }
