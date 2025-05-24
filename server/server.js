@@ -1,16 +1,34 @@
 const WebSocket = require("ws");
 const server = new WebSocket.Server({ port: 8080 });
 
+// Logger function for human-readable output
+const log = (level, message, meta = {}) => {
+  const timestamp = new Date().toLocaleString();
+  let logMessage = `[${timestamp}] ${level}: ${message}`;
+  if (Object.keys(meta).length) {
+    logMessage += ` | ${Object.entries(meta)
+      .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+      .join(", ")}`;
+  }
+  console.log(logMessage);
+};
+
 let players = {};
 let nextId = 1;
 
 server.on("connection", (ws) => {
-  let playerId = nextId++;
+  const playerId = nextId++;
   let playerName = "Anonymous";
 
-  // Wait for the client to send their name first
+  log("INFO", `New connection established`, { playerId });
+
   ws.on("message", (msg) => {
-    const data = JSON.parse(msg);
+    let data;
+    try {
+      data = JSON.parse(msg);
+    } catch (error) {
+      return;
+    }
 
     if (data.type === "login" && data.name) {
       playerName = data.name;
@@ -51,13 +69,17 @@ server.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    log("INFO", `Player disconnected`, { playerId, playerName });
     delete players[playerId];
+    let broadcastCount = 0;
     server.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify({ type: "leave", id: playerId }));
+        broadcastCount++;
       }
     });
+    log("INFO", `Broadcasted player leave`, { playerId, broadcastCount });
   });
 });
 
-console.log("WebSocket server running on ws://localhost:8080");
+log("INFO", `Server initializing`, { port: 8080 });
