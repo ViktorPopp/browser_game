@@ -57,10 +57,6 @@
         { x: 200, y: 400, width: 200, height: 20 },
         { x: 500, y: 300, width: 150, height: 20 },
       ];
-
-      const gravity = 0.5;
-      const jumpForce = -12;
-      const moveSpeed = 5;
       let cameraX = 0;
 
       function startGame() {
@@ -101,63 +97,25 @@
 
       const keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false };
       document.addEventListener("keydown", (e) => {
-        if (e.key in keys) keys[e.key] = true;
-        if (e.key === "ArrowUp" && players[playerId]?.onGround) {
-          players[playerId].vy = jumpForce;
-          players[playerId].onGround = false;
+        if (e.key in keys && !keys[e.key]) {
+          keys[e.key] = true;
+          sendInput();
         }
       });
       document.addEventListener("keyup", (e) => {
-        if (e.key in keys) keys[e.key] = false;
+        if (e.key in keys) {
+          keys[e.key] = false;
+          sendInput();
+        }
       });
 
-      function updatePlayer() {
-        if (!players[playerId]) return;
-        const player = players[playerId];
-        player.vx = 0;
-        if (keys.ArrowLeft) player.vx = -moveSpeed;
-        if (keys.ArrowRight) player.vx = moveSpeed;
-        player.vy += gravity;
-        player.x += player.vx;
-        player.y += player.vy;
-
-        // Platform collision
-        player.onGround = false;
-        for (const platform of platforms) {
-          if (
-            player.x < platform.x + platform.width &&
-            player.x + player.width > platform.x &&
-            player.y + player.height > platform.y &&
-            player.y + player.height - player.vy <= platform.y
-          ) {
-            player.y = platform.y - player.height;
-            player.vy = 0;
-            player.onGround = true;
-          }
-        }
-
-        // Ground collision
-        if (player.y > canvas.height - player.height) {
-          player.y = canvas.height - player.height;
-          player.vy = 0;
-          player.onGround = true;
-        }
-
-        // Update camera to follow player
-        cameraX = player.x - canvas.width / 2 + player.width / 2;
-        cameraX = Math.max(0, Math.min(cameraX, 2000 - canvas.width)); // World width: 2000
-
-        // Send update to server
+      function sendInput() {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(
             JSON.stringify({
-              type: "update",
+              type: "input",
               id: playerId,
-              x: player.x,
-              y: player.y,
-              vx: player.vx,
-              vy: player.vy,
-              onGround: player.onGround,
+              keys: { ...keys },
             })
           );
         }
@@ -165,6 +123,15 @@
 
       function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Update camera to follow player
+        if (players[playerId]) {
+          cameraX =
+            players[playerId].x -
+            canvas.width / 2 +
+            players[playerId].width / 2;
+          cameraX = Math.max(0, Math.min(cameraX, 2000 - canvas.width)); // World width: 2000
+        }
 
         // Draw platforms
         ctx.fillStyle = "#333";
@@ -189,7 +156,6 @@
       }
 
       function gameLoop() {
-        updatePlayer();
         draw();
         requestAnimationFrame(gameLoop);
       }
