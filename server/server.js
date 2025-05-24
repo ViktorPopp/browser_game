@@ -5,25 +5,45 @@ let players = {};
 let nextId = 1;
 
 server.on("connection", (ws) => {
-  const id = nextId++;
-  players[id] = { x: 100, y: 100 };
+  let playerId = nextId++;
+  let playerName = "Anonymous";
 
-  ws.send(JSON.stringify({ type: "init", id, players }));
-
-  server.clients.forEach((client) => {
-    if (client !== ws && client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: "join", id, x: 100, y: 100 }));
-    }
-  });
-
+  // Wait for the client to send their name first
   ws.on("message", (msg) => {
     const data = JSON.parse(msg);
-    if (data.type === "move") {
-      players[id] = { x: data.x, y: data.y };
+
+    if (data.type === "login" && data.name) {
+      playerName = data.name;
+      players[playerId] = { x: 100, y: 100, name: playerName };
+
+      // Send init message with all players and new player id
+      ws.send(JSON.stringify({ type: "init", id: playerId, players }));
+
+      // Notify all other players about new player
+      server.clients.forEach((client) => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(
+            JSON.stringify({
+              type: "join",
+              id: playerId,
+              x: 100,
+              y: 100,
+              name: playerName,
+            })
+          );
+        }
+      });
+    }
+
+    if (data.type === "move" && players[playerId]) {
+      players[playerId].x = data.x;
+      players[playerId].y = data.y;
+
+      // Broadcast new position to all clients
       server.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
           client.send(
-            JSON.stringify({ type: "move", id, x: data.x, y: data.y })
+            JSON.stringify({ type: "move", id: playerId, x: data.x, y: data.y })
           );
         }
       });
@@ -31,10 +51,10 @@ server.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
-    delete players[id];
+    delete players[playerId];
     server.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify({ type: "leave", id }));
+        client.send(JSON.stringify({ type: "leave", id: playerId }));
       }
     });
   });

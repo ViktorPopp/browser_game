@@ -33,6 +33,23 @@
         if (e.code === "ArrowUp") keys.up = false;
       });
 
+      let playerName = null;
+
+      function promptName() {
+        playerName = prompt(
+          "Enter your player name:",
+          "Player" + Math.floor(Math.random() * 1000)
+        );
+        if (!playerName || playerName.trim() === "") {
+          playerName = "Player" + Math.floor(Math.random() * 1000);
+        }
+      }
+
+      socket.onopen = () => {
+        promptName();
+        socket.send(JSON.stringify({ type: "login", name: playerName }));
+      };
+
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
@@ -40,7 +57,7 @@
           localPlayerId = data.id;
           Object.assign(players, data.players);
         } else if (data.type === "join") {
-          players[data.id] = { x: data.x, y: data.y };
+          players[data.id] = { x: data.x, y: data.y, name: data.name };
         } else if (data.type === "move") {
           if (players[data.id]) {
             players[data.id].x = data.x;
@@ -91,6 +108,14 @@
           const p = players[id];
           ctx.fillStyle = id == localPlayerId ? "#00f" : "#f00";
           ctx.fillRect(p.x, p.y, 30, 30);
+
+          // Draw name tag above player
+          if (p.name) {
+            ctx.fillStyle = "#000";
+            ctx.font = "14px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(p.name, p.x + 15, p.y - 5);
+          }
         }
       }
 
